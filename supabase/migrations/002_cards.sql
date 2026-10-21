@@ -1,5 +1,5 @@
 CREATE TABLE IF NOT EXISTS cards (
-    id           UUID        PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id           UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
     quadrant_id  UUID        NOT NULL REFERENCES quadrants(id) ON DELETE CASCADE,
     content      TEXT        NOT NULL DEFAULT '',
     order_index  INTEGER     NOT NULL DEFAULT 0,

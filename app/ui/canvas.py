@@ -134,7 +134,7 @@ def _build_quadrant_column(
         async def on_disconnect(q_id=quadrant_id, r=refresh) -> None:
             realtime_ui.unregister(q_id, r)
 
-        ui.on_disconnect(on_disconnect)
+        ui.context.client.on_disconnect(on_disconnect)
 
 
 def _render_card(
