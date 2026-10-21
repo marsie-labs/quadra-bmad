@@ -5,41 +5,43 @@ from app.database import get_client
 
 logger = logging.getLogger(__name__)
 
-_task: asyncio.Task | None = None
+_tasks: list[asyncio.Task] = []
 
 
-def _handle_change(payload: dict) -> None:
-    event = payload.get("eventType") or payload.get("type", "unknown")
-    row_id = (payload.get("new") or {}).get("id", "—")
-    logger.info("Realtime workspace change: event=%s id=%s", event, row_id)
+def _make_handler(table: str):
+    def _handle_change(payload: dict) -> None:
+        event = payload.get("eventType") or payload.get("type", "unknown")
+        row_id = (payload.get("new") or {}).get("id", "—")
+        logger.info("Realtime %s change: event=%s id=%s", table, event, row_id)
+    return _handle_change
 
 
-async def _listen() -> None:
+async def _listen(table: str) -> None:
     client = await get_client()
-    channel = client.channel("workspace-realtime")
+    channel = client.channel(f"{table}-realtime")
     channel.on_postgres_changes(
         event="*",
         schema="public",
-        table="workspaces",
-        callback=_handle_change,
+        table=table,
+        callback=_make_handler(table),
     )
     await channel.subscribe()
-    logger.info("Realtime subscription active on workspaces")
+    logger.info("Realtime subscription active on %s", table)
     try:
-        # Hold the task open until cancelled at shutdown
         await asyncio.Event().wait()
     except asyncio.CancelledError:
         await channel.unsubscribe()
         raise
 
 
+def _error_callback(t: asyncio.Task) -> None:
+    if not t.cancelled() and t.exception():
+        logger.error("Realtime task exited: %s", t.exception())
+
+
 async def subscribe() -> None:
-    global _task
-    _task = asyncio.create_task(_listen())
-    _task.add_done_callback(
-        lambda t: (
-            logger.error("Realtime task exited: %s", t.exception())
-            if not t.cancelled() and t.exception()
-            else None
-        )
-    )
+    global _tasks
+    for table in ("workspaces", "cards"):
+        task = asyncio.create_task(_listen(table))
+        task.add_done_callback(_error_callback)
+        _tasks.append(task)

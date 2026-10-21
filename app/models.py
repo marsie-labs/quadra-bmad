@@ -43,3 +43,27 @@ class SessionResponse(BaseModel):
     access_url: str
     project_name: str
     canvas: CanvasState
+
+
+class CardCreate(BaseModel):
+    quadrant_id: UUID
+    content: str = ""
+    order_index: int = 0
+    author_id: str | None = None
+
+
+class CardUpdate(BaseModel):
+    content: str | None = None
+    quadrant_id: UUID | None = None
+    order_index: int | None = None
+
+
+class CardOut(BaseModel):
+    id: UUID
+    quadrant_id: UUID
+    content: str
+    order_index: int
+    author_id: str | None
+    deleted_at: datetime | None
+    created_at: datetime
+    updated_at: datetime

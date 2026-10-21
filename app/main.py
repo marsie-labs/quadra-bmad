@@ -3,6 +3,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 
 from app import realtime
+from app.routers.cards import router as cards_router
 from app.routers.sessions import router as sessions_router
 
 
@@ -10,12 +11,14 @@ from app.routers.sessions import router as sessions_router
 async def lifespan(app: FastAPI):
     await realtime.subscribe()
     yield
-    if realtime._task and not realtime._task.done():
-        realtime._task.cancel()
+    for task in realtime._tasks:
+        if not task.done():
+            task.cancel()
 
 
 app = FastAPI(title="Quadra", lifespan=lifespan)
 app.include_router(sessions_router)
+app.include_router(cards_router)
 
 
 if __name__ == "__main__":

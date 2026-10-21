@@ -118,11 +118,12 @@ def test_get_session_unknown_token_returns_404():
 
 # Matrix row 3: realtime callback handles all payload shapes without raising
 def test_realtime_handle_change_does_not_crash():
-    from app.realtime import _handle_change
+    from app.realtime import _make_handler
 
-    _handle_change({"eventType": "INSERT", "new": {"id": WS_ID}, "old": {}})
-    _handle_change({"eventType": "UPDATE", "new": {"id": WS_ID}, "old": {"id": WS_ID}})
-    _handle_change({})
+    handler = _make_handler("workspaces")
+    handler({"eventType": "INSERT", "new": {"id": WS_ID}, "old": {}})
+    handler({"eventType": "UPDATE", "new": {"id": WS_ID}, "old": {"id": WS_ID}})
+    handler({})
 
 
 # Matrix row 4: duplicate project name creates a new session (no error)
