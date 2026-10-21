@@ -23,6 +23,7 @@ WORKSPACE_ROW = {
     "session_id": SESSION_ID,
     "access_token": ACCESS_TOKEN,
     "project_name": "TestProject",
+    "status": "open",
     "created_at": NOW,
 }
 CANVAS_ROW = {
@@ -138,3 +139,120 @@ def test_duplicate_name_allowed(http):
 def test_blank_name_returns_422(http):
     resp = http.post("/sessions", json={"project_name": ""})
     assert resp.status_code == 422
+
+
+# --- Session closure and results ---
+
+def _make_close_mock(workspace_status="open", found=True):
+    ws_row = {**WORKSPACE_ROW, "status": workspace_status}
+    closed_row = {**ws_row, "status": "closed"}
+
+    def table_factory(name):
+        tbl = MagicMock()
+        if name == "workspaces":
+            tbl.select.return_value.eq.return_value.execute = AsyncMock(
+                return_value=MagicMock(data=[ws_row] if found else [])
+            )
+            tbl.update.return_value.eq.return_value.execute = AsyncMock(
+                return_value=MagicMock(data=[closed_row])
+            )
+        return tbl
+
+    mock = MagicMock()
+    mock.table = MagicMock(side_effect=table_factory)
+    return mock
+
+
+def _make_results_mock(workspace_status="closed", found=True):
+    ws_row = {**WORKSPACE_ROW, "status": workspace_status}
+
+    def table_factory(name):
+        tbl = MagicMock()
+        if name == "workspaces":
+            tbl.select.return_value.eq.return_value.execute = AsyncMock(
+                return_value=MagicMock(data=[ws_row] if found else [])
+            )
+        elif name == "canvases":
+            tbl.select.return_value.eq.return_value.execute = AsyncMock(
+                return_value=MagicMock(data=[CANVAS_ROW])
+            )
+        elif name == "quadrants":
+            tbl.select.return_value.eq.return_value.execute = AsyncMock(
+                return_value=MagicMock(data=QUADRANT_ROWS)
+            )
+        elif name == "cards":
+            tbl.select.return_value.eq.return_value.is_.return_value.order.return_value.execute = AsyncMock(
+                return_value=MagicMock(data=[])
+            )
+        return tbl
+
+    mock = MagicMock()
+    mock.table = MagicMock(side_effect=table_factory)
+    return mock
+
+
+# Close matrix row 1: close open session → 200 with status=closed
+def test_close_open_session_returns_200():
+    mock_client = _make_close_mock(workspace_status="open")
+    with (
+        patch("app.routers.sessions.get_client", AsyncMock(return_value=mock_client)),
+        patch("app.realtime.subscribe", new_callable=AsyncMock),
+    ):
+        with TestClient(app) as c:
+            resp = c.post(f"/sessions/{WS_ID}/close")
+    assert resp.status_code == 200
+    assert resp.json()["status"] == "closed"
+
+
+# Close matrix row 1 (error): unknown session_id → 404
+def test_close_unknown_session_returns_404():
+    mock_client = _make_close_mock(found=False)
+    with (
+        patch("app.routers.sessions.get_client", AsyncMock(return_value=mock_client)),
+        patch("app.realtime.subscribe", new_callable=AsyncMock),
+    ):
+        with TestClient(app) as c:
+            resp = c.post(f"/sessions/{WS_ID}/close")
+    assert resp.status_code == 404
+
+
+# Close matrix row 2: already-closed session → 409
+def test_close_already_closed_session_returns_409():
+    mock_client = _make_close_mock(workspace_status="closed")
+    with (
+        patch("app.routers.sessions.get_client", AsyncMock(return_value=mock_client)),
+        patch("app.realtime.subscribe", new_callable=AsyncMock),
+    ):
+        with TestClient(app) as c:
+            resp = c.post(f"/sessions/{WS_ID}/close")
+    assert resp.status_code == 409
+    assert "already closed" in resp.json()["detail"]
+
+
+# Results matrix row 1: results on closed session → 200 with quadrant structure
+def test_get_results_closed_session_returns_200():
+    mock_client = _make_results_mock(workspace_status="closed")
+    with (
+        patch("app.routers.sessions.get_client", AsyncMock(return_value=mock_client)),
+        patch("app.realtime.subscribe", new_callable=AsyncMock),
+    ):
+        with TestClient(app) as c:
+            resp = c.get(f"/sessions/{WS_ID}/results")
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["status"] == "closed"
+    assert len(body["quadrants"]) == 4
+    assert all("cards" in q for q in body["quadrants"])
+
+
+# Results matrix row 2: results on open session → 409
+def test_get_results_open_session_returns_409():
+    mock_client = _make_results_mock(workspace_status="open")
+    with (
+        patch("app.routers.sessions.get_client", AsyncMock(return_value=mock_client)),
+        patch("app.realtime.subscribe", new_callable=AsyncMock),
+    ):
+        with TestClient(app) as c:
+            resp = c.get(f"/sessions/{WS_ID}/results")
+    assert resp.status_code == 409
+    assert "still open" in resp.json()["detail"]

@@ -42,6 +42,7 @@ class SessionResponse(BaseModel):
     access_token: UUID
     access_url: str
     project_name: str
+    status: str
     canvas: CanvasState
 
 
@@ -67,3 +68,17 @@ class CardOut(BaseModel):
     deleted_at: datetime | None
     created_at: datetime
     updated_at: datetime
+
+
+class QuadrantResults(BaseModel):
+    id: UUID
+    type: QuadrantType
+    cards: list[CardOut]
+
+
+class SessionResultsOut(BaseModel):
+    session_id: UUID
+    project_name: str
+    status: str
+    canvas_id: UUID
+    quadrants: list[QuadrantResults]

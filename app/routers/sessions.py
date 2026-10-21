@@ -5,10 +5,13 @@ from fastapi import APIRouter, HTTPException, Request
 from app.database import get_client
 from app.models import (
     CanvasState,
+    CardOut,
     QuadrantOut,
+    QuadrantResults,
     QuadrantType,
     SessionCreate,
     SessionResponse,
+    SessionResultsOut,
 )
 
 router = APIRouter(prefix="/sessions", tags=["sessions"])
@@ -49,6 +52,7 @@ async def create_session(body: SessionCreate, request: Request) -> SessionRespon
         access_token=workspace["access_token"],
         access_url=access_url,
         project_name=workspace["project_name"],
+        status=workspace["status"],
         canvas=CanvasState(
             canvas_id=canvas["id"],
             workspace_id=workspace["id"],
@@ -100,10 +104,100 @@ async def get_session(access_token: UUID, request: Request) -> SessionResponse:
         access_token=workspace["access_token"],
         access_url=access_url,
         project_name=workspace["project_name"],
+        status=workspace["status"],
         canvas=CanvasState(
             canvas_id=canvas["id"],
             workspace_id=workspace["id"],
             is_active=canvas["is_active"],
             quadrants=[QuadrantOut(**q) for q in quadrants_data],
         ),
+    )
+
+
+@router.post("/{session_id}/close")
+async def close_session(session_id: UUID) -> dict:
+    client = await get_client()
+
+    workspaces = (
+        await client.table("workspaces")
+        .select("*")
+        .eq("id", str(session_id))
+        .execute()
+    ).data
+
+    if not workspaces:
+        raise HTTPException(status_code=404, detail="Session not found")
+
+    workspace = workspaces[0]
+    if workspace["status"] == "closed":
+        raise HTTPException(status_code=409, detail="Session is already closed")
+
+    result = (
+        await client.table("workspaces")
+        .update({"status": "closed"})
+        .eq("id", str(session_id))
+        .execute()
+    )
+    if not result.data:
+        raise HTTPException(status_code=500, detail="Failed to close session")
+    return result.data[0]
+
+
+@router.get("/{session_id}/results", response_model=SessionResultsOut)
+async def get_session_results(session_id: UUID) -> SessionResultsOut:
+    client = await get_client()
+
+    workspaces = (
+        await client.table("workspaces")
+        .select("*")
+        .eq("id", str(session_id))
+        .execute()
+    ).data
+
+    if not workspaces:
+        raise HTTPException(status_code=404, detail="Session not found")
+
+    workspace = workspaces[0]
+    if workspace["status"] != "closed":
+        raise HTTPException(status_code=409, detail="Session is still open")
+
+    canvases = (
+        await client.table("canvases")
+        .select("*")
+        .eq("workspace_id", workspace["id"])
+        .execute()
+    ).data
+    if not canvases:
+        raise HTTPException(status_code=500, detail="Canvas data corrupted")
+    canvas = canvases[0]
+
+    quadrants_data = (
+        await client.table("quadrants")
+        .select("*")
+        .eq("canvas_id", canvas["id"])
+        .execute()
+    ).data
+
+    quadrant_results = []
+    for q in quadrants_data:
+        cards = (
+            await client.table("cards")
+            .select("*")
+            .eq("quadrant_id", q["id"])
+            .is_("deleted_at", "null")
+            .order("order_index")
+            .execute()
+        ).data
+        quadrant_results.append(QuadrantResults(
+            id=q["id"],
+            type=q["type"],
+            cards=[CardOut(**c) for c in cards],
+        ))
+
+    return SessionResultsOut(
+        session_id=workspace["id"],
+        project_name=workspace["project_name"],
+        status=workspace["status"],
+        canvas_id=canvas["id"],
+        quadrants=quadrant_results,
     )
