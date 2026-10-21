@@ -16,3 +16,9 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="Quadra", lifespan=lifespan)
 app.include_router(sessions_router)
+
+
+if __name__ == "__main__":
+    import uvicorn
+    from app.config import settings
+    uvicorn.run("app.main:app", host="0.0.0.0", port=settings.port, reload=True)
