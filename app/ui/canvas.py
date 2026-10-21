@@ -75,6 +75,8 @@ async def canvas_page(access_token: str) -> None:
             if is_closed:
                 ui.label("Session closed").classes("text-sm bg-white/20 px-3 py-1 rounded")
             else:
+                _btn_ref: list = []
+
                 async def open_close_dialog(ws_id=workspace["id"]) -> None:
                     with ui.dialog() as dlg, ui.card():
                         ui.label("Close this session?").classes("font-semibold text-lg")
@@ -84,6 +86,8 @@ async def canvas_page(access_token: str) -> None:
 
                         async def confirm_close() -> None:
                             dlg.close()
+                            if _btn_ref:
+                                _btn_ref[0].set_visibility(False)
                             try:
                                 c = await get_client()
                                 res = (
@@ -95,6 +99,8 @@ async def canvas_page(access_token: str) -> None:
                                 if not res.data:
                                     raise RuntimeError("Close returned no data")
                             except Exception as e:
+                                if _btn_ref:
+                                    _btn_ref[0].set_visibility(True)
                                 ui.notify(f"Failed to close session: {e}", color="negative")
                                 return
                             ui.navigate.reload()
@@ -104,7 +110,7 @@ async def canvas_page(access_token: str) -> None:
                             ui.button("Cancel", on_click=dlg.close).props("flat")
                     dlg.open()
 
-                ui.button("Close Session", on_click=open_close_dialog).props("flat color=white outline")
+                _btn_ref.append(ui.button("Close Session", on_click=open_close_dialog).props("flat color=white outline"))
 
     with ui.row().classes("w-full gap-4 p-4 flex-nowrap"):
         for quadrant in quadrants_data:

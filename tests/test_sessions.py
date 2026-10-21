@@ -256,3 +256,15 @@ def test_get_results_open_session_returns_409():
             resp = c.get(f"/sessions/{WS_ID}/results")
     assert resp.status_code == 409
     assert "still open" in resp.json()["detail"]
+
+
+# Results matrix row (error): unknown session_id → 404
+def test_get_results_unknown_session_returns_404():
+    mock_client = _make_results_mock(found=False)
+    with (
+        patch("app.routers.sessions.get_client", AsyncMock(return_value=mock_client)),
+        patch("app.realtime.subscribe", new_callable=AsyncMock),
+    ):
+        with TestClient(app) as c:
+            resp = c.get(f"/sessions/{WS_ID}/results")
+    assert resp.status_code == 404

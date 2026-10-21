@@ -1,5 +1,6 @@
 from datetime import datetime
 from enum import Enum
+from typing import Literal
 from uuid import UUID
 
 from pydantic import BaseModel, field_validator
@@ -42,7 +43,7 @@ class SessionResponse(BaseModel):
     access_token: UUID
     access_url: str
     project_name: str
-    status: str
+    status: Literal["open", "closed"]
     canvas: CanvasState
 
 
@@ -79,6 +80,6 @@ class QuadrantResults(BaseModel):
 class SessionResultsOut(BaseModel):
     session_id: UUID
     project_name: str
-    status: str
+    status: Literal["open", "closed"]
     canvas_id: UUID
     quadrants: list[QuadrantResults]
