@@ -8,6 +8,7 @@ dependencies = [
     "uvicorn[standard]>=0.32.0",
     "python-dotenv>=1.0.0",
     "pydantic-settings>=2.6.0",
+    "nicegui>=2.0.0",
 ]
 
 [build-system]

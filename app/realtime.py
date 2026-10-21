@@ -2,6 +2,7 @@ import asyncio
 import logging
 
 from app.database import get_client
+from app.ui import realtime_ui
 
 logger = logging.getLogger(__name__)
 
@@ -11,8 +12,13 @@ _tasks: list[asyncio.Task] = []
 def _make_handler(table: str):
     def _handle_change(payload: dict) -> None:
         event = payload.get("eventType") or payload.get("type", "unknown")
-        row_id = (payload.get("new") or {}).get("id", "—")
+        row = payload.get("new") or payload.get("old") or {}
+        row_id = row.get("id", "—")
         logger.info("Realtime %s change: event=%s id=%s", table, event, row_id)
+        if table == "cards":
+            quadrant_id = row.get("quadrant_id")
+            if quadrant_id:
+                realtime_ui.notify(quadrant_id)
     return _handle_change
 
 

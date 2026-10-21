@@ -42,7 +42,7 @@ async def create_session(body: SessionCreate, request: Request) -> SessionRespon
     ).data
 
     base_url = str(request.base_url).rstrip("/")
-    access_url = f"{base_url}/sessions/{workspace['access_token']}"
+    access_url = f"{base_url}/board/{workspace['access_token']}"
 
     return SessionResponse(
         session_id=workspace["id"],
@@ -93,7 +93,7 @@ async def get_session(access_token: UUID, request: Request) -> SessionResponse:
     ).data
 
     base_url = str(request.base_url).rstrip("/")
-    access_url = f"{base_url}/sessions/{workspace['access_token']}"
+    access_url = f"{base_url}/board/{workspace['access_token']}"
 
     return SessionResponse(
         session_id=workspace["id"],

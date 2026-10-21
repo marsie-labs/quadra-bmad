@@ -89,7 +89,7 @@ def test_create_session_returns_201_with_full_canvas(http):
     body = resp.json()
     assert uuid.UUID(body["session_id"])
     assert uuid.UUID(body["access_token"])
-    assert "/sessions/" in body["access_url"]
+    assert "/board/" in body["access_url"]
     assert len(body["canvas"]["quadrants"]) == 4
     types = {q["type"] for q in body["canvas"]["quadrants"]}
     assert types == {"IS", "IS_NOT", "DOES", "DOES_NOT"}
